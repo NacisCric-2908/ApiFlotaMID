@@ -1,0 +1,509 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API Flota MID - Recomendaciones y alertas",
+    "description": "MID de Flota del clúster Rodar: recomienda los mejores vehículos cerca de un punto y lista las alertas operativas de la flota. Combina el CRUD de Flota con las zonas de Viajes y zonas.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Salud"
+        ],
+        "summary": "Estado del servicio",
+        "operationId": "verificarSalud",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Verificarsalud"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recomendaciones/vehiculo": {
+      "get": {
+        "tags": [
+          "Recomendaciones"
+        ],
+        "summary": "Los 3 mejores vehículos cerca de un punto",
+        "description": "Reglas, en orden: (1) vehículos `disponible` a 500 m o menos; (2) se descartan los de batería menor a 25 %; (3) se descartan los que están en una zona prohibida (se consulta a Viajes y zonas); (4) se ordena por `puntaje = distanciaMetros - bateriaPct * 2` (menor es mejor) y se devuelven los 3 mejores. Si no queda ninguno, responde **200** con la lista vacía y un `motivo`. Si Viajes y zonas no responde, responde **503**: no se recomienda un vehículo sin validar las zonas.",
+        "operationId": "recomendarVehiculo",
+        "security": [
+          {
+            "GatewaySecret": []
+          },
+          {
+            "OAuth2Gateway": [
+              "recomendaciones:leer"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90,
+              "minimum": -90,
+              "description": "Latitud del punto donde está el usuario.",
+              "title": "Lat"
+            },
+            "description": "Latitud del punto donde está el usuario."
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180,
+              "minimum": -180,
+              "description": "Longitud del punto donde está el usuario.",
+              "title": "Lng"
+            },
+            "description": "Longitud del punto donde está el usuario."
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "scooter",
+                    "bicicleta"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Si se indica, solo vehículos de ese tipo.",
+              "title": "Tipo"
+            },
+            "description": "Si se indica, solo vehículos de ese tipo."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recomendaciones"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta la cabecera secreta del gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Viajes y zonas o el servicio de vehículos no responden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flota/alertas": {
+      "get": {
+        "tags": [
+          "Alertas"
+        ],
+        "summary": "Vehículos que requieren atención del equipo operativo",
+        "description": "Un vehículo `disponible` genera una alerta por cada condición que cumple: batería menor a 15 % (`bateria_baja`; prioridad **alta** si es menor a 10 %, **media** si no), está en una zona prohibida (`zona_prohibida`; **alta**), o su ubicación no se actualiza hace más de 2 horas (`sin_actualizar`; **media**). Ordenadas por prioridad y luego por tiempo sin actualizar (la más antigua primero). Si Viajes y zonas no responde, **no falla**: devuelve las demás alertas y la advertencia `zonas_no_verificadas`.",
+        "operationId": "listarAlertas",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alertas"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta la cabecera secreta del gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "El servicio de vehículos no responde",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "GatewaySecret": []
+          },
+          {
+            "OAuth2Gateway": [
+              "alertas:leer"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AlertaSalida": {
+        "properties": {
+          "vehiculoId": {
+            "type": "string",
+            "title": "Vehiculoid"
+          },
+          "tipoAlerta": {
+            "type": "string",
+            "enum": [
+              "bateria_baja",
+              "zona_prohibida",
+              "sin_actualizar"
+            ],
+            "title": "Tipoalerta"
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "alta",
+              "media"
+            ],
+            "title": "Prioridad",
+            "description": "`alta` si la batería es menor a 10 % o está en zona prohibida; `media` en los demás casos."
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "scooter",
+              "bicicleta"
+            ],
+            "title": "Tipo"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "bateriaPct": {
+            "type": "integer",
+            "title": "Bateriapct"
+          },
+          "ubicacion": {
+            "$ref": "#/components/schemas/Punto"
+          },
+          "localidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localidad"
+          },
+          "actualizadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizadoen"
+          },
+          "minutosSinActualizar": {
+            "type": "integer",
+            "title": "Minutossinactualizar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vehiculoId",
+          "tipoAlerta",
+          "prioridad",
+          "detalle",
+          "tipo",
+          "estado",
+          "bateriaPct",
+          "ubicacion",
+          "actualizadoEn",
+          "minutosSinActualizar"
+        ],
+        "title": "AlertaSalida"
+      },
+      "Alertas": {
+        "properties": {
+          "alertas": {
+            "items": {
+              "$ref": "#/components/schemas/AlertaSalida"
+            },
+            "type": "array",
+            "title": "Alertas",
+            "description": "Una alerta por cada condición que cumple un vehículo, ordenadas por prioridad y luego por tiempo sin actualizar (la más antigua primero)."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "advertencias": {
+            "items": {
+              "type": "string",
+              "const": "zonas_no_verificadas"
+            },
+            "type": "array",
+            "title": "Advertencias",
+            "description": "`zonas_no_verificadas`: Viajes y zonas no respondió; faltan las alertas de zona prohibida."
+          }
+        },
+        "type": "object",
+        "required": [
+          "alertas",
+          "total"
+        ],
+        "title": "Alertas"
+      },
+      "ErrorRespuesta": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "detalle": {
+            "title": "Detalle",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "mensaje"
+        ],
+        "title": "ErrorRespuesta",
+        "description": "Formato de error común a todos los servicios del clúster."
+      },
+      "Punto": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "Point",
+            "title": "Type",
+            "default": "Point"
+          },
+          "coordinates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Coordinates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coordinates"
+        ],
+        "title": "Punto",
+        "description": "Punto GeoJSON. Ojo: el orden de las coordenadas es [longitud, latitud]."
+      },
+      "Recomendaciones": {
+        "properties": {
+          "recomendaciones": {
+            "items": {
+              "$ref": "#/components/schemas/VehiculoRecomendado"
+            },
+            "type": "array",
+            "title": "Recomendaciones",
+            "description": "Hasta 3, del mejor al peor puntaje."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sin_vehiculos_cercanos",
+                  "todos_en_zona_prohibida"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo",
+            "description": "Solo aparece si la lista está vacía: por qué no hay recomendaciones."
+          }
+        },
+        "type": "object",
+        "required": [
+          "recomendaciones",
+          "total"
+        ],
+        "title": "Recomendaciones"
+      },
+      "VehiculoRecomendado": {
+        "properties": {
+          "vehiculoId": {
+            "type": "string",
+            "title": "Vehiculoid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "scooter",
+              "bicicleta"
+            ],
+            "title": "Tipo"
+          },
+          "distanciaMetros": {
+            "type": "number",
+            "title": "Distanciametros",
+            "description": "Distancia desde el punto pedido, sobre la esfera, en metros."
+          },
+          "bateriaPct": {
+            "type": "integer",
+            "title": "Bateriapct"
+          },
+          "puntaje": {
+            "type": "number",
+            "title": "Puntaje",
+            "description": "`distanciaMetros - bateriaPct * 2`. Menor es mejor."
+          },
+          "ubicacion": {
+            "$ref": "#/components/schemas/Punto"
+          },
+          "localidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localidad",
+            "description": "Localidad de Bogotá donde está el vehículo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "vehiculoId",
+          "tipo",
+          "distanciaMetros",
+          "bateriaPct",
+          "puntaje",
+          "ubicacion"
+        ],
+        "title": "VehiculoRecomendado"
+      }
+    },
+    "securitySchemes": {
+      "GatewaySecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Gateway-Secret"
+      },
+      "OAuth2Gateway": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "scopes": {
+              "recomendaciones:leer": "Pedir recomendaciones de vehículos",
+              "alertas:leer": "Consultar las alertas operativas de la flota"
+            },
+            "tokenUrl": "/token"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Recomendaciones",
+      "description": "Los mejores vehículos cerca de un punto."
+    },
+    {
+      "name": "Alertas",
+      "description": "Vehículos que requieren atención del equipo operativo."
+    },
+    {
+      "name": "Salud",
+      "description": "Estado del servicio (público, sin token)."
+    }
+  ]
+}
