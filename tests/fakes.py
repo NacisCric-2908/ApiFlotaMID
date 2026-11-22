@@ -78,3 +78,35 @@ class RelojFalso:
 
     def ahora(self) -> datetime:
         return self._ahora
+
+
+# ---------- HTTP simulado ----------
+import httpx  # noqa: E402
+
+# Un vehículo tal como lo devuelve el CRUD de Flota (respuesta real).
+ITEM_CRUD = {
+    "tipo": "bicicleta", "bateriaPct": 59, "estado": "disponible",
+    "ubicacion": {"type": "Point", "coordinates": [-74.07165, 4.711]},
+    "id": "veh-0016", "localidad": {"codigo": "11", "nombre": "Suba"},
+    "actualizadoEn": "2026-11-22T14:20:28.958000Z", "distanciaMetros": 49.9,
+}  # fmt: skip
+
+
+def cliente_simulado(handler) -> httpx.AsyncClient:
+    """Cliente httpx sin red: `handler(request)` (sync o async) devuelve la respuesta o lanza un error."""
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+class Registro:
+    """Anota las peticiones y responde con lo que se le indique, en orden (la última se repite)."""
+
+    def __init__(self, *respuestas):
+        self.respuestas = list(respuestas)
+        self.peticiones: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request):
+        self.peticiones.append(request)
+        r = self.respuestas[min(len(self.peticiones), len(self.respuestas)) - 1]
+        if isinstance(r, Exception):
+            raise r
+        return r
