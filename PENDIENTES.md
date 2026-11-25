@@ -6,16 +6,17 @@ Estado: **versión 0.1.0** en `develop`, con los dos endpoints del enunciado, 14
 
 ## 1. Bloqueantes: sin esto no funciona fuera de la máquina de desarrollo
 
-- [ ] **Subir el repositorio a GitHub** (hoy es solo local) y dar acceso a los compañeros de Flota. Responsable: ______
+- [ ] **Subir el repositorio a GitHub** (hoy es solo local; será público) y dar acceso a los compañeros de Flota. Responsable: ______
 - [ ] **Probar contra Viajes y zonas real.** Hoy solo se probó contra el simulador. Hay que confirmar tres supuestos con ese grupo (si algo difiere, solo cambia `app/adaptadores/salida/zonas_http.py` y `ZONAS_RUTA`):
   1. La ruta: el MID llama `GET {gateway}/viajes/zonas/verificar?lat&lng`.
   2. La respuesta: se usa solo `permitida` (booleano); `permitida: false` significa zona prohibida. Lo demás de `zonas` no se usa.
   3. El alcance: se pide `zonas:leer` (el de la matriz del enunciado).
   Responsable: ______
-- [ ] **Probar contra el token real del gateway.** Se supone el flujo estándar OAuth2 *client credentials* (`POST /token` con formulario, respuesta con `access_token` y `expires_in`). Si el gateway publica otro formato, solo cambia `app/adaptadores/salida/token.py`. Responsable: ______
-- [ ] **CI/CD:** pipeline por *pull request* (correr las pruebas) y despliegue al fusionar. Las pruebas corren con un solo comando: `docker compose --profile test run --rm --build test`. Responsable: ______
-- [ ] **Desplegar en Azure** (ver «Diagrama de nube» de `Proyecto Rodar.drawio`): contenedor en el mismo entorno de Container Apps que el CRUD de Flota. `GATEWAY_SECRET`, `FLOTA_CRUD_SECRET` y `CLIENT_SECRET` como secretos, nunca en la imagen. Debe haber un ambiente de pruebas con los datos semilla. Responsable: ______
-- [ ] **Datos de conexión:** completar la sección 0 de [docs/integracion.md](docs/integracion.md) cuando el gateway esté desplegado. Responsable: ______
+- [x] **Token real del gateway.** Verificado: el gateway (repositorio ApiWategay) emite el token con el flujo estándar OAuth2 *client credentials* (`POST /token` con formulario) y este MID lo pide y lo usa sin cambios, probado de punta a punta con el CRUD real y el gateway real en Docker (cliente `mid-flota`, alcance `zonas:leer`).
+- [x] **CI/CD y despliegue escritos:** `.github/workflows/ci.yml` (pruebas y validación de Bicep por pull request), `cd.yml` (construye la imagen y despliega a Azure al fusionar a `main`, con OIDC) e `infra/app.bicep` (ingreso interno, secretos de Container Apps). Guía: [docs/despliegue-azure.md](docs/despliegue-azure.md).
+- [ ] **Ejecutar el despliegue de verdad** (nada se ha corrido contra Azure): configurar Azure y GitHub una sola vez según la guía del repositorio ApiFlota (`docs/despliegue-azure.md`) y desplegar en orden ApiFlota → este MID → ApiWategay. Responsable: ______
+- [ ] **Reglas de rama y flujo con pull requests** (marcar el job `pruebas` del CI como requerido). Responsable: ______
+- [ ] **Datos de conexión:** completar la sección 0 de [docs/integracion.md](docs/integracion.md) cuando el gateway esté desplegado (URL pública y credenciales). Responsable: ______
 
 ## 2. Con el líder del gateway
 
