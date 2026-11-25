@@ -8,6 +8,7 @@ Primera versión del **MID de Flota** (clúster Rodar).
 
 ### Agregado
 
+- Despliegue en Azure: plantilla Bicep (`infra/app.bicep`, Container Apps con ingreso interno), CI por pull request y CD con OIDC (`.github/workflows/`), y guía `docs/despliegue-azure.md`.
 - `GET /recomendaciones/vehiculo?lat&lng&tipo`: los 3 mejores vehículos a 500 m o menos (disponibles, batería de al menos 25 %, fuera de zonas prohibidas), ordenados por `puntaje = distancia - batería × 2`. Lista vacía con `motivo` si no hay candidatos; `503` si Viajes y zonas no responde.
 - `GET /flota/alertas`: una alerta por cada condición (batería menor a 15 %, zona prohibida, más de 2 h sin actualizar), con prioridad, ordenadas por prioridad y antigüedad. Si Viajes y zonas no responde, degrada con la advertencia `zonas_no_verificadas`.
 - `GET /health` público y rechazo con `401` de toda petición sin la cabecera `X-Gateway-Secret` del gateway.

@@ -1,0 +1,70 @@
+name: Despliegue a Azure
+
+# Se despliega al fusionar a main (las versiones) o a mano desde la pestaña Actions.
+# Requiere la configuración de una sola vez de docs/despliegue-azure.md (y que el CRUD de Flota ya esté desplegado).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # para autenticarse en Azure sin contraseñas (OIDC)
+  contents: read
+
+concurrency:
+  group: despliegue-flota-mid
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GRUPO: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP: flota-mid
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Iniciar sesión en Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Construir y publicar la imagen en el registro (ACR)
+        run: |
+          ACR="$(az acr list --resource-group "$GRUPO" --query "[0].name" -o tsv)"
+          [ -n "$ACR" ] || { echo "No hay un ACR en el grupo $GRUPO: cree antes la plataforma (repositorio ApiFlota, infra/plataforma.bicep)" >&2; exit 1; }
+          az acr login --name "$ACR"
+          IMAGEN="$ACR.azurecr.io/flota-mid:${GITHUB_SHA}"
+          docker build --target prod --tag "$IMAGEN" .
+          docker push "$IMAGEN"
+          echo "IMAGEN=$IMAGEN" >> "$GITHUB_ENV"
+
+      - name: Desplegar
+        env:
+          GATEWAY_SECRET: ${{ secrets.FLOTA_MID_SECRET }}
+          FLOTA_CRUD_SECRET: ${{ secrets.FLOTA_CRUD_SECRET }}
+          CLIENT_SECRET: ${{ secrets.MID_FLOTA_CLIENT_SECRET }}
+          FLOTA_CRUD_URL: ${{ vars.FLOTA_CRUD_URL }}
+          GATEWAY_URL: ${{ vars.GATEWAY_URL }}
+        run: |
+          for v in GATEWAY_SECRET FLOTA_CRUD_SECRET CLIENT_SECRET; do
+            [ -n "${!v}" ] || { echo "Falta un secreto del repositorio (ver docs/despliegue-azure.md): $v" >&2; exit 1; }
+          done
+          az extension add --name containerapp --upgrade --yes --only-show-errors
+          # Conserva el «modo demo» (réplicas mínimas) que se haya dejado en la aplicación.
+          MIN="$(az containerapp show --name "$APP" --resource-group "$GRUPO" --query properties.template.scale.minReplicas -o tsv 2>/dev/null || true)"
+          az deployment group create \
+            --resource-group "$GRUPO" \
+            --template-file infra/app.bicep \
+            --parameters imagen="$IMAGEN" gatewaySecret="$GATEWAY_SECRET" flotaCrudSecret="$FLOTA_CRUD_SECRET" \
+                         clientSecret="$CLIENT_SECRET" replicasMinimas="${MIN:-0}" \
+                         flotaCrudUrl="${FLOTA_CRUD_URL:-}" gatewayUrl="${GATEWAY_URL:-}" \
+            --query properties.outputs --output json
+
+      - name: Estado de la revisión
+        run: |
+          az containerapp revision list --name "$APP" --resource-group "$GRUPO" \
+            --query "[?properties.active].{revision:name, estado:properties.runningState, salud:properties.healthState}" --output table

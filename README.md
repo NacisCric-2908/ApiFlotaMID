@@ -15,6 +15,7 @@ MID (capa de lógica de negocio) del grupo **Flota** del clúster Rodar. No guar
 | Para | Documento |
 | --- | --- |
 | **Consumir el MID** (otros equipos): rutas del gateway, alcances, ejemplos, errores | [docs/integracion.md](docs/integracion.md) |
+| **Desplegarlo en Azure** (equipo de Flota) | [docs/despliegue-azure.md](docs/despliegue-azure.md) |
 | Qué falta por hacer (para el equipo de Flota) | [PENDIENTES.md](PENDIENTES.md) |
 | Cambios por versión | [CHANGELOG.md](CHANGELOG.md) |
 
