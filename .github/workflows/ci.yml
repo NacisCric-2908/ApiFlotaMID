@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Pruebas (sin red: los servicios externos se simulan)
+      - name: Pruebas (sin red, los servicios externos se simulan)
         run: make test
 
   infra:
