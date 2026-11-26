@@ -1,0 +1,58 @@
+services:
+  mid:
+    build:
+      context: .
+      target: prod
+    restart: unless-stopped
+    # Si se activa el perfil «simulado», el MID espera a que el simulador esté arriba; si no, no depende de nadie.
+    depends_on:
+      simulador:
+        condition: service_started
+        required: false
+    environment:
+      # Del gateway hacia el MID
+      GATEWAY_SECRET: ${GATEWAY_SECRET:-cambiar-este-secreto}
+      # Del MID hacia el CRUD de Flota (llamada entre servicios; el CRUD exige su propia cabecera secreta)
+      FLOTA_CRUD_URL: ${FLOTA_CRUD_URL:-http://simulador:9000}
+      FLOTA_CRUD_SECRET: ${FLOTA_CRUD_SECRET:-secreto-del-crud-simulado}
+      # Del MID hacia Viajes y zonas, siempre por el gateway y con el token de este MID
+      GATEWAY_URL: ${GATEWAY_URL:-http://simulador:9000}
+      CLIENT_ID: ${CLIENT_ID:-mid-flota}
+      CLIENT_SECRET: ${CLIENT_SECRET:-secreto-del-mid-simulado}
+      # Reglas de negocio (los valores por defecto son los del enunciado)
+      RADIO_BUSQUEDA_M: ${RADIO_BUSQUEDA_M:-500}
+      BATERIA_MINIMA: ${BATERIA_MINIMA:-25}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-8100}:8000"
+
+  # Simula Flota CRUD, Viajes y zonas y el token del gateway, con los datos semilla acordados.
+  simulador:
+    profiles: ["simulado"]
+    build:
+      context: .
+      target: simulador
+    restart: unless-stopped
+    environment:
+      CRUD_SECRET: ${FLOTA_CRUD_SECRET:-secreto-del-crud-simulado}
+      CLIENT_ID: ${CLIENT_ID:-mid-flota}
+      CLIENT_SECRET: ${CLIENT_SECRET:-secreto-del-mid-simulado}
+    ports:
+      - "${SIMULADOR_PORT:-9000}:9000"
+
+  # Pruebas: docker compose --profile test run --rm test
+  test:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+    environment:
+      GATEWAY_SECRET: test-secret
+      FLOTA_CRUD_URL: http://crud.prueba
+      FLOTA_CRUD_SECRET: secreto-crud-prueba
+      GATEWAY_URL: http://gateway.prueba
+      CLIENT_ID: mid-flota
+      CLIENT_SECRET: secreto-mid-prueba
+      # Las pruebas nunca llaman servicios reales; sin esperas para que sean rápidas.
+      EXTERNOS_BACKOFF_S: "0"
+      LOG_LEVEL: warning
